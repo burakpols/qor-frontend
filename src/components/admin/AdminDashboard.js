@@ -111,7 +111,18 @@ const AdminDashboard = () => {
   const [savingSettings, setSavingSettings] = useState(false);
   const [adminTheme, setAdminTheme] = useState(localStorage.getItem("mihman_admin_theme") || "light");
 
-  const apiUrl = `http://${window.location.hostname}:3800/api/v1`;
+  // Dynamic API URL - Railway backend URL for production, localhost for local dev
+  const getApiUrl = () => {
+    // Production'da Railway backend URL'i kullan
+    if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+      // Environment variable'dan Railway backend URL al
+      return process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api/v1` : "";
+    }
+    // Local development
+    return `http://localhost:3800/api/v1`;
+  };
+
+  const apiUrl = getApiUrl();
   const token = localStorage.getItem("adminToken");
 
   const getAuthHeaders = () => ({

@@ -22,7 +22,20 @@ const AdminLogin = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  const apiUrl = `http://${window.location.hostname}:3800/api/v1`;
+  // Dynamic API URL - Railway backend URL for production, localhost for local dev
+  const getApiUrl = () => {
+    // Production'da Railway backend URL'i kullan
+    if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+      // Backend Railway URL - .up.railway.app sonra backend Railway URL'inizi buraya ekleyin
+      // Örnek: return "https://mihman-backend.up.railway.app/api/v1";
+      // Veya environment variable'dan al
+      return process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api/v1` : "";
+    }
+    // Local development
+    return `http://localhost:3800/api/v1`;
+  };
+  
+  const apiUrl = getApiUrl();
 
   const handleLogin = async (e) => {
     e.preventDefault();

@@ -1,8 +1,25 @@
 import axios from "axios";
 
 // Base API URL
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3800/api/v1";
-const LEGACY_API_URL = process.env.REACT_APP_API_LEGACY_URL || "http://localhost:3800";
+// Dynamic API URL for production (Railway) or local development
+const getApiUrl = () => {
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  // Local development fallback
+  return "http://localhost:3800/api/v1";
+};
+
+const getLegacyApiUrl = () => {
+  if (process.env.REACT_APP_API_LEGACY_URL) {
+    return process.env.REACT_APP_API_LEGACY_URL;
+  }
+  // Local development fallback
+  return "http://localhost:3800";
+};
+
+const API_URL = getApiUrl();
+const LEGACY_API_URL = getLegacyApiUrl();
 
 // Create axios instance
 const apiClient = axios.create({

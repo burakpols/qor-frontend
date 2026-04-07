@@ -27,8 +27,17 @@ const ProductTable = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // const main_url = "http://localhost:3800";
-  const main_url= "https://mihman-be.vercel.app"
-  const fetchItems = async () => {
+// Dynamic API URL for production (Railway) or local development
+const getApiUrl = () => {
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  return "http://localhost:3800/api/v1";
+};
+
+const main_url = getApiUrl();
+
+const fetchItems = async () => {
     try {
       const response = await axios.get(`${main_url}/items`);
       setItems(response.data);

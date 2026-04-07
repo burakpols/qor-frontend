@@ -9,7 +9,15 @@ const Qr = () => {
   const [menuItems, setMenuItems] = useState([]);
   const [categories, setCategories] = useState(["Hepsi"]);
   const [loading, setLoading] = useState(true); // Add loading state
-  const mainUrl = process.env.REACT_APP_API_URL || "http://localhost:3800/api/v1"; // Define main URL
+  // Dynamic API URL for production (Railway) or local development
+const getApiUrl = () => {
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  return "http://localhost:3800/api/v1";
+};
+
+const mainUrl = getApiUrl();
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {

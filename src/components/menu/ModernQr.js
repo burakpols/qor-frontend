@@ -45,11 +45,15 @@ import { toast } from "react-toastify";
 import { useSearchParams } from "react-router-dom";
 import "./ModernQr.css";
 
-// Get dynamic API URL based on current hostname
+// Get dynamic API URL - Railway backend URL for production, localhost for local dev
 const getApiUrl = () => {
-  const hostname = window.location.hostname;
-  const port = 3800; // Backend always runs on 3800
-  return `http://${hostname}:${port}/api/v1`;
+  // Production'da Railway backend URL'i kullan
+  if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    // Environment variable'dan Railway backend URL al
+    return process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api/v1` : "";
+  }
+  // Local development
+  return `http://localhost:3800/api/v1`;
 };
 
 const ModernQr = () => {
