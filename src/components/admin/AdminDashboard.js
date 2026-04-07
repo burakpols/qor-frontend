@@ -510,8 +510,9 @@ const AdminDashboard = () => {
           >
             <Tab label="📦 Ürünler" />
             <Tab label="📋 Siparişler" />
-            <Tab label="� Analitik" />
-            <Tab label="�👥 Ayarlar" />
+            <Tab label="📊 Analitik" />
+            <Tab label="👥 Kullanıcılar" />
+            <Tab label="⚙️ Ayarlar" />
           </Tabs>
         </Box>
 
@@ -1235,7 +1236,30 @@ const AdminDashboard = () => {
             )}
 
             {/* Ayarlar */}
+            {/* Kullanıcılar */}
             {tabValue === 3 && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <Alert severity="info" sx={{ mb: 3, backgroundColor: currentTheme.bgSecondary }}>
+                  <Typography sx={{ fontWeight: 600 }}>
+                    👥 Kullanıcı Yönetimi
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: currentTheme.textSecondary }}>
+                    Bu bölümde kullanıcıları yönetebilirsiniz. API: GET/POST/PUT/DELETE /api/v1/users
+                  </Typography>
+                </Alert>
+                <Box sx={{ textAlign: "center", py: 4 }}>
+                  <Typography sx={{ color: "#999", mb: 2 }}>
+                    Kullanıcı yönetimi yakında eklenecek
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: currentTheme.textSecondary }}>
+                    Backend API hazır: /api/v1/users
+                  </Typography>
+                </Box>
+              </motion.div>
+            )}
+
+            {/* Ayarlar */}
+            {tabValue === 4 && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <Grid container spacing={3}>
                   {/* Restoran Bilgileri */}
