@@ -1,0 +1,17 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[context.production]
+  environment = { REACT_APP_API_URL = "https://mihman-backend.up.railway.app" }
+
+[context.development]
+  environment = { REACT_APP_API_URL = "http://localhost:3800" }

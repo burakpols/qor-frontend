@@ -1,0 +1,140 @@
+            {/* Siparişler */}
+            {tabValue === 1 && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <Box sx={{ mb: 3 }}>
+                  {/* Status Filtreleri */}
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
+                      Duruma Göre Filtrele
+                    </Typography>
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                      {[
+                        { value: "all", label: "Tümü", color: "#6b7280" },
+                        { value: "pending", label: "Beklemede", color: "#f59e0b" },
+                        { value: "confirmed", label: "Onaylandı", color: "#3b82f6" },
+                        { value: "prepared", label: "Hazırlandı", color: "#8b5cf6" },
+                        { value: "served", label: "Servis Edildi", color: "#10b981" },
+                      ].map((filter) => (
+                        <Button
+                          key={filter.value}
+                          variant={statusFilter === filter.value ? "contained" : "outlined"}
+                          onClick={() => setStatusFilter(filter.value)}
+                          sx={{
+                            backgroundColor: statusFilter === filter.value ? filter.color : "transparent",
+                            borderColor: filter.color,
+                            color: statusFilter === filter.value ? "#fff" : filter.color,
+                            fontWeight: 600,
+                            textTransform: "none",
+                            "&:hover": {
+                              backgroundColor: statusFilter === filter.value ? filter.color : filter.color + "15",
+                            },
+                          }}
+                        >
+                          {filter.label}
+                        </Button>
+                      ))}
+                    </Box>
+                  </Box>
+
+                  {/* Arama */}
+                  <Box sx={{ mb: 3 }}>
+                    <TextField
+                      placeholder="Masa veya müşteri adıyla ara..."
+                      value={searchText}
+                      onChange={(e) => setSearchText(e.target.value)}
+                      fullWidth
+                      size="small"
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: "8px",
+                          "&:hover fieldset": { borderColor: "#1a9b8e" },
+                          "&.Mui-focused fieldset": { borderColor: "#1a9b8e" },
+                        },
+                      }}
+                    />
+                  </Box>
+                </Box>
+
+                {filteredOrders.length === 0 ? (
+                  <Box sx={{ textAlign: "center", py: 8 }}>
+                    <Typography sx={{ color: "#999", fontSize: "16px" }}>
+                      Sipariş bulunamadı
+                    </Typography>
+                  </Box>
+                ) : (
+                  <TableContainer component={Paper}>
+                    <Table>
+                      <TableHead sx={{ backgroundColor: "#f8f9fa" }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700 }}>Masa</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Müşteri</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }} align="center">
+                            Ürün Sayısı
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 700 }} align="right">
+                            Toplam
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Durum</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Zaman</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }} align="center">
+                            İşlemler
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {filteredOrders.map((order) => (
+                          <TableRow key={order._id} hover>
+                            <TableCell sx={{ fontWeight: 700, color: "#1a9b8e" }}>
+                              {order.tableNumber ? `Masa ${order.tableNumber}` : "N/A"}
+                            </TableCell>
+                            <TableCell sx={{ fontWeight: 500 }}>
+                              {order.customerName || "Bilinmeyen Müşteri"}
+                            </TableCell>
+                            <TableCell align="center">{order.items?.length || 0}</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600, color: "#1a9b8e" }}>
+                              ₺{order.total?.toFixed(2) || "0.00"}
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={order.status}
+                                color={
+                                  order.status === "served"
+                                    ? "success"
+                                    : order.status === "cancelled"
+                                    ? "error"
+                                    : order.status === "prepared"
+                                    ? "info"
+                                    : order.status === "confirmed"
+                                    ? "primary"
+                                    : "warning"
+                                }
+                                size="small"
+                                sx={{ fontWeight: 600 }}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ color: "#999", fontSize: "12px" }}>
+                              {new Date(order.createdAt).toLocaleString("tr-TR")}
+                            </TableCell>
+                            <TableCell align="center">
+                              <Button
+                                size="small"
+                                variant="contained"
+                                onClick={() => handleOpenOrderDetails(order)}
+                                sx={{
+                                  backgroundColor: "#1a9b8e",
+                                  "&:hover": { backgroundColor: "#158577" },
+                                  fontSize: "11px",
+                                  textTransform: "none",
+                                }}
+                              >
+                                Detay
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </motion.div>
+            )}
