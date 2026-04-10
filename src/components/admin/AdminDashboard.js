@@ -55,6 +55,8 @@ import {
 import axios from "axios";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
+import Users from "./Users";
+import AdminAIChat from "../chat/AdminAIChat";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, PieChart, Pie, Cell
@@ -75,7 +77,7 @@ const getStatusTurkish = (status) => {
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [tabValue, setTabValue] = useState(0);
+  const [tabValue, setTabValue] = useState("orders");
   const [items, setItems] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -124,10 +126,48 @@ const AdminDashboard = () => {
 
   const apiUrl = getApiUrl();
   const token = localStorage.getItem("adminToken");
+  const adminRole = localStorage.getItem("adminRole");
 
   const getAuthHeaders = () => ({
     headers: { Authorization: `Bearer ${token}` },
   });
+
+  // JWT Token Expired Handler - Global axios interceptor
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        // Sadece 401 (token geçersiz/süresi dolmuş) ve token doğrulama 403'lerinde çıkış yap
+        // Yetki hatası (permission 403) durumunda çıkış YAPMA - sadece hatayı döndür
+        if (error.response) {
+          if (error.response.status === 401) {
+            // Token geçersiz veya süresi dolmuş-
+            localStorage.removeItem("adminToken");
+            localStorage.removeItem("adminRole");
+            toast.error("Oturum süreniz doldu. Lütfen tekrar giriş yapın.");
+            navigate("/admin");
+          } else if (error.response.status === 403) {
+            // Token doğrulama hatası (Failed to authenticate token) vs yetki hatası ayır
+            const msg = error.response.data?.message || "";
+            if (msg.includes("Failed to authenticate") || msg.includes("Token not provided")) {
+              // Token doğrulama hatası - gerçek oturum sorunu
+              localStorage.removeItem("adminToken");
+              localStorage.removeItem("adminRole");
+              toast.error("Oturum süreniz doldu. Lütfen tekrar giriş yapın.");
+              navigate("/admin");
+            }
+            // Diğer 403'ler (yetki hatası) - çıkış yapma, hatayı component'e bırak
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    // Component unmount olduğunda interceptor'u temizle
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
+  }, [navigate]);
 
   // Verileri yükle
   useEffect(() => {
@@ -214,23 +254,55 @@ const AdminDashboard = () => {
         console.warn("Settings load error:", error.message);
       }
       
-      // Fetch analytics separately (non-blocking)
-      try {
-        const analyticsRes = await axios.get(`${apiUrl}/analytics`, getAuthHeaders());
-        if (analyticsRes?.data) {
-          setAnalytics(analyticsRes.data);
+      // Fetch analytics separately (non-blocking) - Only for admin/manager/superadmin
+      if (adminRole === "superadmin" || adminRole === "admin" || adminRole === "manager") {
+        try {
+          const analyticsRes = await axios.get(`${apiUrl}/analytics`, getAuthHeaders());
+          if (analyticsRes?.data) {
+            // Normalize analytics data - ensure all fields exist with defaults
+            const data = analyticsRes.data;
+            setAnalytics({
+              summary: { totalOrders: 0, completedOrders: 0, pendingOrders: 0, cancelledOrders: 0, totalRevenue: "0", completionRate: 0, cancelRate: 0, averageOrderValue: 0, tableUtilization: 0, ...data.summary },
+              mostOrderedItems: data.mostOrderedItems || [],
+              ordersByTable: data.ordersByTable || [],
+              ordersByStatus: data.ordersByStatus || {},
+              dailyRevenue: data.dailyRevenue || [],
+              hourlyOrders: data.hourlyOrders || [],
+              categoryStats: data.categoryStats || [],
+              revenueComparison: { today: 0, yesterday: 0, changePercent: 0, ...data.revenueComparison },
+              lowestPerformingItems: data.lowestPerformingItems || [],
+              productCombinations: data.productCombinations || [],
+              repeatCustomerRate: data.repeatCustomerRate || 0,
+              avgPrepTime: data.avgPrepTime || 0,
+              targetVsActual: { percentage: 0, actual: 0, target: 0, ...data.targetVsActual },
+              peakHours: data.peakHours || [],
+              categoryPerformance: data.categoryPerformance || [],
+              weeklyComparison: { thisWeek: { orders: 0, revenue: 0 }, lastWeek: { orders: 0, revenue: 0 }, changePercent: 0, ...data.weeklyComparison },
+            });
+          }
+        } catch (analyticsError) {
+          console.warn("Analytics endpoint not available:", analyticsError.message);
+          // Set empty analytics to prevent infinite loading
+          setAnalytics({
+            summary: { totalOrders: 0, completedOrders: 0, pendingOrders: 0, cancelledOrders: 0, totalRevenue: "0", completionRate: 0, cancelRate: 0, averageOrderValue: 0, tableUtilization: 0 },
+            mostOrderedItems: [],
+            ordersByTable: [],
+            ordersByStatus: {},
+            dailyRevenue: [],
+            hourlyOrders: [],
+            categoryStats: [],
+            revenueComparison: { today: 0, yesterday: 0, changePercent: 0 },
+            lowestPerformingItems: [],
+            productCombinations: [],
+            repeatCustomerRate: 0,
+            avgPrepTime: 0,
+            targetVsActual: { percentage: 0, actual: 0, target: 0 },
+            peakHours: [],
+            categoryPerformance: [],
+            weeklyComparison: { thisWeek: { orders: 0, revenue: 0 }, lastWeek: { orders: 0, revenue: 0 }, changePercent: 0 },
+          });
+          toast.warning("Analitik veriler yüklenemedi");
         }
-      } catch (analyticsError) {
-        console.warn("Analytics endpoint not available:", analyticsError.message);
-        // Set empty analytics to prevent infinite loading
-        setAnalytics({
-          summary: { totalOrders: 0, completedOrders: 0, pendingOrders: 0, cancelledOrders: 0, totalRevenue: "0" },
-          mostOrderedItems: [],
-          ordersByTable: [],
-          ordersByStatus: {},
-          dailyRevenue: [],
-        });
-        toast.warning("Analitik veriler yüklenemedi");
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -464,7 +536,7 @@ const AdminDashboard = () => {
             {[
               { title: "Ürünler", value: stats.items, icon: "📦", color: "#3b82f6", bgColor: "#3b82f615" },
               { title: "Siparişler", value: stats.orders, icon: "📋", color: "#8b5cf6", bgColor: "#8b5cf615" },
-              { title: "Gelir (Servis)", value: `₺${stats.revenue.toFixed(0)}`, icon: "💰", color: "#10b981", bgColor: "#10b98115" },
+              ...(adminRole !== "waiter" ? [{ title: "Gelir (Servis)", value: `₺${stats.revenue.toFixed(0)}`, icon: "💰", color: "#10b981", bgColor: "#10b98115" }] : []),
               { title: "Aktif Siparişler", value: stats.activeOrders, icon: "⏳", color: "#f59e0b", bgColor: "#f59e0b15" },
               { title: "Düşük Stok", value: items.filter(i => i.trackStock && i.stock <= i.lowStockThreshold).length, icon: "⚠️", color: "#ef4444", bgColor: "#ef444415" },
             ].map((stat, idx) => (
@@ -514,16 +586,29 @@ const AdminDashboard = () => {
           <Tabs
             value={tabValue}
             onChange={(e, v) => setTabValue(v)}
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
             sx={{
-              "& .MuiTab-root": { fontWeight: 600, color: currentTheme.textSecondary },
+              "& .MuiTab-root": { fontWeight: 600, color: currentTheme.textSecondary, minWidth: 'auto', flexShrink: 0 },
               "& .Mui-selected": { color: "#1a9b8e" },
+              "& .MuiTabs-scrollButtons": { opacity: 1 },
             }}
           >
-            <Tab label="📦 Ürünler" />
-            <Tab label="📋 Siparişler" />
-            <Tab label="📊 Analitik" />
-            <Tab label="👥 Kullanıcılar" />
-            <Tab label="⚙️ Ayarlar" />
+            <Tab value="items" label="📦 Ürünler" sx={{ minWidth: '120px' }} />
+            <Tab value="orders" label="📋 Siparişler" sx={{ minWidth: '120px' }} />
+            {(adminRole === "superadmin" || adminRole === "admin" || adminRole === "manager") && (
+              <Tab value="analytics" label="📊 Analitik" sx={{ minWidth: '120px' }} />
+            )}
+            {(adminRole === "superadmin" || adminRole === "admin" || adminRole === "manager") && (
+              <Tab value="analyst" label="🤖 AI Analist" sx={{ minWidth: '120px' }} />
+            )}
+            {(adminRole === "superadmin" || adminRole === "admin") && (
+              <Tab value="users" label="👥 Kullanıcılar" sx={{ minWidth: '120px' }} />
+            )}
+            {adminRole === "superadmin" && (
+              <Tab value="settings" label="⚙️ Ayarlar" sx={{ minWidth: '120px' }} />
+            )}
           </Tabs>
         </Box>
 
@@ -535,8 +620,9 @@ const AdminDashboard = () => {
         ) : (
           <>
             {/* Ürünler */}
-            {tabValue === 0 && (
+            {tabValue === "items" && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                {adminRole !== "waiter" && (
                 <Box sx={{ mb: 2 }}>
                   <Button
                     variant="contained"
@@ -550,6 +636,7 @@ const AdminDashboard = () => {
                     Yeni Ürün
                   </Button>
                 </Box>
+                )}
 
                 <TableContainer component={Paper}>
                   <Table>
@@ -566,9 +653,11 @@ const AdminDashboard = () => {
                         <TableCell sx={{ fontWeight: 700, color: currentTheme.text }} align="center">
                           Durum
                         </TableCell>
+                        {adminRole !== "waiter" && (
                         <TableCell sx={{ fontWeight: 700, color: currentTheme.text }} align="right">
                           İşlemler
                         </TableCell>
+                        )}
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -601,6 +690,7 @@ const AdminDashboard = () => {
                               size="small"
                             />
                           </TableCell>
+                          {adminRole !== "waiter" && (
                           <TableCell align="right">
                             <IconButton 
                               size="small" 
@@ -617,6 +707,7 @@ const AdminDashboard = () => {
                               <DeleteIcon fontSize="small" />
                             </IconButton>
                           </TableCell>
+                          )}
                         </TableRow>
                         );
                       })}
@@ -627,7 +718,7 @@ const AdminDashboard = () => {
             )}
 
             {/* Siparişler */}
-            {tabValue === 1 && (
+            {tabValue === "orders" && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <Box sx={{ mb: 3 }}>
                   {/* Status Filtreleri */}
@@ -768,10 +859,17 @@ const AdminDashboard = () => {
               </motion.div>
             )}
 
-            {/* Analitik */}
-            {tabValue === 2 && (
+            {/* AI Analist */}
+            {tabValue === "analyst" && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                {analytics && analytics.mostOrderedItems?.length > 0 ? (
+                <AdminAIChat adminToken={token} />
+              </motion.div>
+            )}
+
+            {/* Analitik */}
+            {tabValue === "analytics" && (adminRole === "superadmin" || adminRole === "admin" || adminRole === "manager") && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                {analytics ? (
                   <Grid container spacing={3}>
                     {/* Tümü Siparişler Durumu */}
                     <Grid item xs={12} md={6}>
@@ -783,7 +881,7 @@ const AdminDashboard = () => {
                           <ResponsiveContainer width="100%" height={300}>
                             <PieChart>
                               <Pie
-                                data={Object.entries(analytics.ordersByStatus).map(([name, value]) => ({ name, value }))}
+                                data={Object.entries(analytics.ordersByStatus || {}).map(([name, value]) => ({ name, value }))}
                                 cx="50%"
                                 cy="50%"
                                 labelLine={false}
@@ -813,7 +911,7 @@ const AdminDashboard = () => {
                             En Çok Sipariş Edilen Ürünler
                           </Typography>
                           <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={analytics.mostOrderedItems}>
+                            <BarChart data={Array.isArray(analytics.mostOrderedItems) ? analytics.mostOrderedItems : []}>
                               <CartesianGrid strokeDasharray="3 3" />
                               <XAxis dataKey="title" angle={-45} textAnchor="end" height={100} fontSize={12} />
                               <YAxis />
@@ -833,7 +931,7 @@ const AdminDashboard = () => {
                             Son 7 Günün Geliri
                           </Typography>
                           <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={analytics.dailyRevenue}>
+                            <LineChart data={Array.isArray(analytics.dailyRevenue) ? analytics.dailyRevenue : []}>
                               <CartesianGrid strokeDasharray="3 3" />
                               <XAxis dataKey="date" />
                               <YAxis />
@@ -864,7 +962,7 @@ const AdminDashboard = () => {
                                 </TableRow>
                               </TableHead>
                               <TableBody>
-                                {analytics.ordersByTable.map((row, idx) => (
+                                {(analytics.ordersByTable || []).map((row, idx) => (
                                   <TableRow key={idx}>
                                     <TableCell>{row.table}</TableCell>
                                     <TableCell align="right" sx={{ fontWeight: 600, color: "#1a9b8e" }}>
@@ -920,7 +1018,7 @@ const AdminDashboard = () => {
                             Saatlik Sipariş Dağılımı
                           </Typography>
                           <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={analytics.hourlyOrders}>
+                            <LineChart data={Array.isArray(analytics.hourlyOrders) ? analytics.hourlyOrders : []}>
                               <CartesianGrid strokeDasharray="3 3" />
                               <XAxis dataKey="hour" label={{ value: "Saat", position: "insideBottomRight", offset: -5 }} />
                               <YAxis />
@@ -941,7 +1039,7 @@ const AdminDashboard = () => {
                             Kategori Bazlı Satışlar
                           </Typography>
                           <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={analytics.categoryStats}>
+                            <BarChart data={Array.isArray(analytics.categoryStats) ? analytics.categoryStats : []}>
                               <CartesianGrid strokeDasharray="3 3" />
                               <XAxis dataKey="category" />
                               <YAxis />
@@ -965,7 +1063,7 @@ const AdminDashboard = () => {
                               <Box sx={{ textAlign: "center", p: 2, backgroundColor: "#e8f5e9", borderRadius: "8px" }}>
                                 <Typography sx={{ color: "#999", fontSize: "12px", mb: 1 }}>Bugün</Typography>
                                 <Typography sx={{ fontWeight: 700, color: "#10b981", fontSize: "24px" }}>
-                                  ₺{analytics.revenueComparison.today}
+                                  ₺{analytics.revenueComparison?.today || 0}
                                 </Typography>
                               </Box>
                             </Grid>
@@ -973,15 +1071,15 @@ const AdminDashboard = () => {
                               <Box sx={{ textAlign: "center", p: 2, backgroundColor: "#f3f4f6", borderRadius: "8px" }}>
                                 <Typography sx={{ color: "#999", fontSize: "12px", mb: 1 }}>Dün</Typography>
                                 <Typography sx={{ fontWeight: 700, color: "#6b7280", fontSize: "20px" }}>
-                                  ₺{analytics.revenueComparison.yesterday}
+                                  ₺{analytics.revenueComparison?.yesterday || 0}
                                 </Typography>
                               </Box>
                             </Grid>
                             <Grid item xs={12}>
-                              <Box sx={{ textAlign: "center", p: 2, backgroundColor: analytics.revenueComparison.changePercent >= 0 ? "#f0fdf4" : "#fef2f2", borderRadius: "8px", border: `2px solid ${analytics.revenueComparison.changePercent >= 0 ? "#22c55e" : "#ef4444"}` }}>
+                              <Box sx={{ textAlign: "center", p: 2, backgroundColor: (analytics.revenueComparison?.changePercent || 0) >= 0 ? "#f0fdf4" : "#fef2f2", borderRadius: "8px", border: `2px solid ${(analytics.revenueComparison?.changePercent || 0) >= 0 ? "#22c55e" : "#ef4444"}` }}>
                                 <Typography sx={{ fontSize: "12px", color: "#999" }}>Değişim</Typography>
-                                <Typography sx={{ fontWeight: 700, color: analytics.revenueComparison.changePercent >= 0 ? "#22c55e" : "#ef4444", fontSize: "20px" }}>
-                                  {analytics.revenueComparison.changePercent >= 0 ? "↑" : "↓"} {Math.abs(analytics.revenueComparison.changePercent)}%
+                                <Typography sx={{ fontWeight: 700, color: (analytics.revenueComparison?.changePercent || 0) >= 0 ? "#22c55e" : "#ef4444", fontSize: "20px" }}>
+                                  {(analytics.revenueComparison?.changePercent || 0) >= 0 ? "↑" : "↓"} {Math.abs(analytics.revenueComparison?.changePercent || 0)}%
                                 </Typography>
                               </Box>
                             </Grid>
@@ -1178,7 +1276,7 @@ const AdminDashboard = () => {
                             Kategori Performansı (Ort. Sipariş Değeri)
                           </Typography>
                           <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={analytics.categoryPerformance}>
+                            <BarChart data={Array.isArray(analytics.categoryPerformance) ? analytics.categoryPerformance : []}>
                               <CartesianGrid strokeDasharray="3 3" />
                               <XAxis dataKey="category" angle={-45} textAnchor="end" height={100} fontSize={12} />
                               <YAxis />
@@ -1246,31 +1344,15 @@ const AdminDashboard = () => {
               </motion.div>
             )}
 
-            {/* Ayarlar */}
             {/* Kullanıcılar */}
-            {tabValue === 3 && (
+            {tabValue === "users" && (adminRole === "superadmin" || adminRole === "admin") && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <Alert severity="info" sx={{ mb: 3, backgroundColor: currentTheme.bgSecondary }}>
-                  <Typography sx={{ fontWeight: 600 }}>
-                    👥 Kullanıcı Yönetimi
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: currentTheme.textSecondary }}>
-                    Bu bölümde kullanıcıları yönetebilirsiniz. API: GET/POST/PUT/DELETE /api/v1/users
-                  </Typography>
-                </Alert>
-                <Box sx={{ textAlign: "center", py: 4 }}>
-                  <Typography sx={{ color: "#999", mb: 2 }}>
-                    Kullanıcı yönetimi yakında eklenecek
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: currentTheme.textSecondary }}>
-                    Backend API hazır: /api/v1/users
-                  </Typography>
-                </Box>
+                <Users adminRole={adminRole} apiUrl={apiUrl} getAuthHeaders={getAuthHeaders} />
               </motion.div>
             )}
 
             {/* Ayarlar */}
-            {tabValue === 4 && (
+            {tabValue === "settings" && adminRole === "superadmin" && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <Grid container spacing={3}>
                   {/* Restoran Bilgileri */}

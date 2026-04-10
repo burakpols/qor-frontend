@@ -132,8 +132,8 @@ const AdminLogin = () => {
                 fullWidth
                 variant="contained"
                 size="large"
+                type="submit"
                 disabled={loading || !username || !password}
-                onClick={handleLogin}
                 sx={{
                   backgroundColor: "#1a9b8e",
                   height: 48,
@@ -151,19 +151,6 @@ const AdminLogin = () => {
                 {loading ? <CircularProgress size={24} color="inherit" /> : "Giriş Yap"}
               </Button>
             </form>
-
-            {/* Demo Credentials */}
-            <Box sx={{ mt: 3, p: 2, backgroundColor: "#f8f9fa", borderRadius: "8px" }}>
-              <Typography variant="caption" sx={{ color: "#666", fontWeight: 600, display: "block", mb: 1 }}>
-                Demo Hesaplar:
-              </Typography>
-              <Typography variant="caption" sx={{ color: "#999", display: "block" }}>
-                👤 admin / admin123
-              </Typography>
-              <Typography variant="caption" sx={{ color: "#999" }}>
-                👤 manager / manager123
-              </Typography>
-            </Box>
           </Card>
         </motion.div>
       </Container>

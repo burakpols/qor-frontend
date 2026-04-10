@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Card,
@@ -68,6 +68,12 @@ const ModernQr = () => {
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState(null);
   const [quantity, setQuantity] = useState(1);
+
+  // Ürün seçildiğinde miktarı 1'e sıfırla
+  const handleSelectItem = (item) => {
+    setQuantity(1);
+    setSelectedItem(item);
+  };
   const [cart, setCart] = useState([]);
   const [openCart, setOpenCart] = useState(false);
   const [customerEmail, setCustomerEmail] = useState("");
@@ -80,8 +86,66 @@ const ModernQr = () => {
   const [theme, setTheme] = useState(localStorage.getItem("mihman_theme") || "light");
   const [isOpen, setIsOpen] = useState(true);
 
+  // AI Chat States
+  const [openChat, setOpenChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState([
+    {
+      role: "assistant",
+      content: "Merhaba! Ben AI asistanınızım. Menümüz hakkında sorular sorabilir, öneriler alabilirsiniz. Size nasıl yardımcı olabilirim?"
+    }
+  ]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [aiAvailable, setAiAvailable] = useState(null);
+  const chatEndRef = useRef(null);
+
   const apiUrl = getApiUrl();
   const apiUrlVer = apiUrl;
+
+  // AI Chat API handler
+  const handleChatSubmit = async (message) => {
+    const msgToSend = message || chatInput;
+    if (!msgToSend.trim() || chatLoading) return;
+
+    // User message
+    const userMsg = { role: "user", content: msgToSend };
+    setChatMessages(prev => [...prev, userMsg]);
+    setChatInput("");
+    setChatLoading(true);
+
+    // Scroll to bottom
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+
+    try {
+      const history = chatMessages.map(m => ({ role: m.role, content: m.content }));
+      const res = await fetch(`${apiUrl}/ai/menu-chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: msgToSend, conversationHistory: history.slice(0, 10) })
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        setChatMessages(prev => [...prev, { role: "assistant", content: data.response }]);
+        setAiAvailable(true);
+      } else {
+        throw new Error(data.message || "AI hatası");
+      }
+    } catch (err) {
+      setChatMessages(prev => [...prev, { role: "assistant", content: `Hata: ${err.message}` }]);
+    } finally {
+      setChatLoading(false);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    }
+  };
+
+  // Check AI availability
+  useEffect(() => {
+    fetch(`${apiUrl}/ai/status`)
+      .then(res => res.json())
+      .then(data => setAiAvailable(data.available))
+      .catch(() => setAiAvailable(false));
+  }, [apiUrl]);
 
   // Çalışma saati kontrolü
   const checkBusinessHours = (settings) => {
@@ -124,9 +188,49 @@ const ModernQr = () => {
 
   useEffect(() => {
     const fetchSettings = async () => {
+      // LocalStorage cache kontrolü
+      const cachedSettings = localStorage.getItem("qor_settings");
+      const cacheTimestamp = localStorage.getItem("qor_settings_timestamp");
+      const CACHE_DURATION = 15 * 60 * 1000; // 15 DAKİKA cache süresi
+
+      // Eğer cache var ve süresi dolmamışsa cached veriyi kullan
+      if (cachedSettings && cacheTimestamp && (Date.now() - parseInt(cacheTimestamp)) < CACHE_DURATION) {
+        try {
+          const parsedSettings = JSON.parse(cachedSettings);
+          setSettings(parsedSettings);
+          
+          // Theme sync
+          if (parsedSettings.theme) {
+            localStorage.setItem("mihman_theme", parsedSettings.theme);
+            setTheme(parsedSettings.theme);
+          }
+
+          // Masa validasyonu
+          if (tableNumber) {
+            const tableNum = parseInt(tableNumber);
+            const isInactive = parsedSettings.tableSettings?.inactiveTables?.includes(tableNum);
+            const isOutOfRange = tableNum > parsedSettings.tableSettings?.totalTables;
+            
+            if (isInactive || isOutOfRange) {
+              setTableError(true);
+            }
+          }
+          
+          console.log("✅ Settings loaded from cache");
+          return;
+        } catch (e) {
+          console.warn("⚠️ Cache parse error, fetching fresh data");
+        }
+      }
+
+      // Cache yok veya süresi dolmuşsa backend'den çek
       try {
         const response = await axios.get(`${apiUrl}/settings`);
         setSettings(response.data);
+        
+        // Cache'e kaydet
+        localStorage.setItem("qor_settings", JSON.stringify(response.data));
+        localStorage.setItem("qor_settings_timestamp", Date.now().toString());
         
         // Sync theme from backend
         if (response.data.theme) {
@@ -153,14 +257,24 @@ const ModernQr = () => {
             );
           }
         }
+
+        console.log("✅ Settings loaded from server and cached");
       } catch (error) {
         console.error("❌ Settings fetch error:", error.message);
+        
+        // Hata durumunda cache'de veri varsa onu kullan
+        if (cachedSettings) {
+          try {
+            setSettings(JSON.parse(cachedSettings));
+            console.log("✅ Used cached settings after network error");
+          } catch (e) {}
+        }
       }
     };
     
     fetchSettings();
     
-    // Her dakika çalışma saatini kontrol et
+    // Sadece saat kontrolü için interval, settings tekrar çekilmiyor!
     const interval = setInterval(() => {
       if (settings) {
         const openStatus = checkBusinessHours(settings);
@@ -169,7 +283,7 @@ const ModernQr = () => {
     }, 60000);
     
     return () => clearInterval(interval);
-  }, [apiUrl, tableNumber, settings]);
+  }, [apiUrl, tableNumber]);
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -549,7 +663,7 @@ const ModernQr = () => {
                   >
                     <Card
                       className="menu-card"
-                      onClick={() => setSelectedItem(item)}
+                      onClick={() => handleSelectItem(item)}
                       sx={{
                         height: "100%",
                         cursor: "pointer",
@@ -776,15 +890,266 @@ const ModernQr = () => {
         )}
       </Container>
 
-      {/* Cart FAB */}
+      {/* AI Chat Button - Fixed Position */}
+      <button
+        onClick={() => setOpenChat(!openChat)}
+        style={{
+          position: "fixed",
+          bottom: "24px",
+          right: "24px",
+          zIndex: 9999,
+          width: "56px",
+          height: "56px",
+          borderRadius: "50%",
+          backgroundColor: openChat ? "#6b7280" : "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+          background: openChat ? "#6b7280" : "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+          border: "none",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 4px 20px rgba(99, 102, 241, 0.4)",
+          transition: "all 0.3s ease",
+        }}
+      >
+        {openChat ? (
+          <span style={{ fontSize: "24px", color: "#fff" }}>✕</span>
+        ) : (
+          <span style={{ fontSize: "28px" }}>💬</span>
+        )}
+      </button>
+
+      {/* AI Chat Popup - Fixed Position */}
+      {openChat && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "90px",
+            right: "24px",
+            zIndex: 9998,
+            width: "380px",
+            height: "520px",
+            backgroundColor: "#fff",
+            borderRadius: "16px",
+            boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          {/* Chat Header */}
+          <div
+            style={{
+              background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+              padding: "16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(255,255,255,0.2)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "20px",
+                }}
+              >
+                🤖
+              </div>
+              <div>
+                <div style={{ color: "#fff", fontWeight: 600, fontSize: "14px" }}>
+                  AI Asistan
+                </div>
+                <div style={{ color: "rgba(255,255,255,0.8)", fontSize: "11px" }}>
+                  {aiAvailable === null ? "Yükleniyor..." : aiAvailable ? "Çevrimiçi" : "Çevrimdışı"}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setOpenChat(false)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#fff",
+                cursor: "pointer",
+                fontSize: "20px",
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Chat Messages */}
+          <div
+            ref={chatEndRef}
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "16px",
+              backgroundColor: "#f9fafb",
+            }}
+          >
+            {chatMessages.map((msg, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: "flex",
+                  justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+                  marginBottom: "12px",
+                }}
+              >
+                <div
+                  style={{
+                    maxWidth: "80%",
+                    padding: "12px 16px",
+                    borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+                    backgroundColor: msg.role === "user" ? "#6366f1" : "#fff",
+                    color: msg.role === "user" ? "#fff" : "#374151",
+                    fontSize: "14px",
+                    lineHeight: 1.5,
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                  }}
+                >
+                  {msg.content}
+                </div>
+              </div>
+            ))}
+            {chatLoading && (
+              <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: "12px" }}>
+                <div
+                  style={{
+                    padding: "12px 16px",
+                    borderRadius: "16px",
+                    backgroundColor: "#fff",
+                    display: "flex",
+                    gap: "6px",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      backgroundColor: "#9ca3af",
+                      animation: "bounce 1s infinite",
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      backgroundColor: "#9ca3af",
+                      animation: "bounce 1s infinite 0.1s",
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      backgroundColor: "#9ca3af",
+                      animation: "bounce 1s infinite 0.2s",
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Questions */}
+          {chatMessages.length === 1 && (
+            <div style={{ padding: "8px 16px", borderTop: "1px solid #e5e7eb" }}>
+              <div style={{ fontSize: "11px", color: "#6b7280", marginBottom: "8px" }}>
+                Hızlı sorular:
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {["En popüler yemekler?", "Vejetaryen var mı?", "Tatlı önerin?"].map((q, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setChatInput(q);
+                      handleChatSubmit(q);
+                    }}
+                    style={{
+                      fontSize: "11px",
+                      padding: "4px 10px",
+                      backgroundColor: "#f3f4f6",
+                      border: "none",
+                      borderRadius: "12px",
+                      cursor: "pointer",
+                      color: "#374151",
+                    }}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Chat Input */}
+          <div
+            style={{
+              padding: "12px 16px",
+              borderTop: "1px solid #e5e7eb",
+              display: "flex",
+              gap: "8px",
+            }}
+          >
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && handleChatSubmit()}
+              placeholder="Mesajınızı yazın..."
+              style={{
+                flex: 1,
+                padding: "10px 16px",
+                borderRadius: "20px",
+                border: "1px solid #e5e7eb",
+                fontSize: "14px",
+                outline: "none",
+              }}
+            />
+            <button
+              onClick={() => handleChatSubmit()}
+              disabled={!chatInput.trim() || chatLoading}
+              style={{
+                width: "44px",
+                height: "44px",
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "18px",
+                opacity: !chatInput.trim() || chatLoading ? 0.5 : 1,
+              }}
+            >
+              ➤
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Cart FAB - Bottom of screen */}
       <AnimatePresence>
         {cart.length > 0 && (
           <motion.div
-            className="cart-fab"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             exit={{ scale: 0 }}
             transition={{ type: "spring", stiffness: 300 }}
+            style={{ position: "fixed", bottom: "24px", right: openChat ? "420px" : "100px", zIndex: 9997, transition: "right 0.3s ease" }}
           >
             <Button
               variant="contained"
@@ -817,7 +1182,7 @@ const ModernQr = () => {
       {/* Detail Dialog */}
       <Dialog
         open={Boolean(selectedItem)}
-        onClose={() => setSelectedItem(null)}
+        onClose={() => handleSelectItem(null)}
         maxWidth="sm"
         fullWidth
         PaperProps={{
@@ -844,7 +1209,7 @@ const ModernQr = () => {
                 {selectedItem.title}
               </Typography>
               <IconButton
-                onClick={() => setSelectedItem(null)}
+                onClick={() => handleSelectItem(null)}
                 size="small"
                 sx={{ color: colors.textSecondary }}
               >
@@ -1368,7 +1733,9 @@ const ModernQr = () => {
         sx={{ 
           backgroundColor: colors.bgSecondary, 
           borderTop: `1px solid ${colors.border}`,
-          mt: "auto"
+          mt: "auto",
+          position: "relative",
+          zIndex: 1
         }}
       >
         <Container maxWidth="lg">
@@ -1383,7 +1750,7 @@ const ModernQr = () => {
               </Typography>
             </Grid>
 
-            {/* İletişim */}
+              {/* İletişim */}
             <Grid item xs={12} sm={6} md={3}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: colors.text, mb: 2 }}>
                 📞 İletişim
@@ -1392,13 +1759,13 @@ const ModernQr = () => {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <PhoneIcon sx={{ fontSize: 18, color: "#1a9b8e" }} />
                   <Typography variant="body2" sx={{ color: colors.textSecondary }}>
-                    +90 555 123 45 67
+                    {settings?.phone || "+90 555 123 45 67"}
                   </Typography>
                 </Box>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <EmailIcon sx={{ fontSize: 18, color: "#1a9b8e" }} />
                   <Typography variant="body2" sx={{ color: colors.textSecondary }}>
-                    info@mihman.com
+                    {settings?.email || "info@mihman.com"}
                   </Typography>
                 </Box>
               </Box>
@@ -1412,8 +1779,7 @@ const ModernQr = () => {
               <Box sx={{ display: "flex", gap: 1 }}>
                 <LocationIcon sx={{ fontSize: 18, color: "#1a9b8e", flexShrink: 0, mt: 0.3 }} />
                 <Typography variant="body2" sx={{ color: colors.textSecondary }}>
-                  Merkez Cad. No:123<br />
-                  Şehir, 12345
+                  {settings?.address || "Merkez Cad. No:123<br />Şehir, 12345"}
                 </Typography>
               </Box>
             </Grid>
@@ -1424,9 +1790,8 @@ const ModernQr = () => {
                 ⏰ Çalışma Saatleri
               </Typography>
               <Typography variant="body2" sx={{ color: colors.textSecondary }}>
-                Pazartesi - Cuma: 10:00 - 22:00<br />
-                Cumartesi: 11:00 - 23:00<br />
-                Pazar: 12:00 - 22:00
+                {settings?.businessHours?.open || "10:00"} - {settings?.businessHours?.close || "22:00"}<br />
+                7/24 Hizmet
               </Typography>
             </Grid>
           </Grid>
@@ -1437,11 +1802,12 @@ const ModernQr = () => {
           {/* Copyright */}
           <Box sx={{ py: 2, textAlign: "center" }}>
             <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-              © 2024 Mihman. Tüm hakları saklıdır. | v{process.env.REACT_APP_VERSION}
+              © 2026 qor menü. Tüm hakları saklıdır.
             </Typography>
           </Box>
         </Container>
       </Box>
+
     </div>
   );
 };

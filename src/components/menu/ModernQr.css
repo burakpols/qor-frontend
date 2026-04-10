@@ -25,6 +25,17 @@
   z-index: 1000;
 }
 
+/* AI Chat Widget - Z-index yüksek olmalı */
+.fixed.bottom-0.right-0 {
+  z-index: 9999 !important;
+}
+
+/* AI Chat Button - her zaman görünür */
+.fixed.bottom-0.right-0 button:first-of-type {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
 /* Footer - Theme uyumlu (inline style ile) */
 
 /* Responsive */
