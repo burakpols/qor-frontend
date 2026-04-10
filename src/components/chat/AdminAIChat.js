@@ -1,4 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import "./AIMenuChat.css";
 import {
   Box,
   Paper,
@@ -271,16 +274,24 @@ const AdminAIChat = ({ adminToken }) => {
                 border: message.role === "user" ? "none" : "1px solid #e0e0e0",
               }}
             >
-              <Typography
-                sx={{
-                  fontSize: "14px",
-                  lineHeight: 1.6,
-                  whiteSpace: "pre-wrap",
-                  fontFamily: message.role === "user" ? "'Inter', sans-serif" : "'Inter', sans-serif",
-                }}
-              >
-                {message.content}
-              </Typography>
+              {message.role === "assistant" ? (
+                <div className="ai-markdown-content">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <Typography
+                  sx={{
+                    fontSize: "14px",
+                    lineHeight: 1.6,
+                    whiteSpace: "pre-wrap",
+                    fontFamily: "'Inter', sans-serif",
+                  }}
+                >
+                  {message.content}
+                </Typography>
+              )}
             </Box>
           </Box>
         ))}

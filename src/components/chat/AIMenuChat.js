@@ -1,4 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import "./AIMenuChat.css";
 
 const AIMenuChat = ({ apiUrl }) => {
   const [messages, setMessages] = useState([]);
@@ -243,9 +246,17 @@ const AIMenuChat = ({ apiUrl }) => {
                     : "bg-white text-gray-800 rounded-bl-md shadow-sm border border-gray-100"
                 }`}
               >
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                  {message.content}
-                </p>
+                {message.role === "assistant" ? (
+                  <div className="ai-markdown-content">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
+                ) : (
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                    {message.content}
+                  </p>
+                )}
               </div>
             </div>
           ))}
