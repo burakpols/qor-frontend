@@ -7,8 +7,8 @@ const AdminPage = () => {
   const users = [
     {
       id: 1,
-      username: "mihman",
-      password: "Mihman123!",
+      username: "akay",
+      password: "akay123!",
       role: "admin",
     },
   ];

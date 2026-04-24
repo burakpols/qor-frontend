@@ -27,7 +27,7 @@ const AdminLogin = () => {
     // Production'da Railway backend URL'i kullan
     if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
       // Backend Railway URL - .up.railway.app sonra backend Railway URL'inizi buraya ekleyin
-      // Örnek: return "https://mihman-backend.up.railway.app/api/v1";
+      // Örnek: return "https://akay-backend.up.railway.app/api/v1";
       // Veya environment variable'dan al
       return process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api/v1` : "";
     }
@@ -83,7 +83,7 @@ const AdminLogin = () => {
             {/* Header */}
             <Box sx={{ textAlign: "center", mb: 4 }}>
               <Typography variant="h3" sx={{ fontWeight: 700, color: "#0d1b2a", mb: 1 }}>
-                🍽️ Mihman
+                🍽️ akay
               </Typography>
               <Typography variant="body1" sx={{ color: "#1a9b8e", fontWeight: 600 }}>
                 Yönetim Paneli

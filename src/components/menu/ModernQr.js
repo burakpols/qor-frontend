@@ -83,7 +83,7 @@ const ModernQr = () => {
   const [openSuccess, setOpenSuccess] = useState(false);
   const [settings, setSettings] = useState(null);
   const [tableError, setTableError] = useState(false);
-  const [theme, setTheme] = useState(localStorage.getItem("mihman_theme") || "light");
+  const [theme, setTheme] = useState(localStorage.getItem("akay_theme") || "light");
   const [isOpen, setIsOpen] = useState(true);
 
   // AI Chat States
@@ -201,7 +201,7 @@ const ModernQr = () => {
           
           // Theme sync
           if (parsedSettings.theme) {
-            localStorage.setItem("mihman_theme", parsedSettings.theme);
+            localStorage.setItem("akay_theme", parsedSettings.theme);
             setTheme(parsedSettings.theme);
           }
 
@@ -234,7 +234,7 @@ const ModernQr = () => {
         
         // Sync theme from backend
         if (response.data.theme) {
-          localStorage.setItem("mihman_theme", response.data.theme);
+          localStorage.setItem("akay_theme", response.data.theme);
           setTheme(response.data.theme);
         }
         
@@ -480,7 +480,7 @@ const ModernQr = () => {
               <Box sx={{ fontSize: "32px" }}>🍽️</Box>
               <Box>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: colors.text, lineHeight: 1.2 }}>
-                  {settings?.restaurantName || "Mihman"}
+                  {settings?.restaurantName || "akay"}
                 </Typography>
                 <Typography variant="caption" sx={{ color: "#1a9b8e", fontWeight: 600 }}>
                   {settings?.slogan || "Kalitelinin adresi"}
@@ -1743,7 +1743,7 @@ const ModernQr = () => {
             {/* İşletme Bilgisi - Dinamik from Settings */}
             <Grid item xs={12} sm={6} md={3}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: colors.text, mb: 2 }}>
-                🏢 {settings?.restaurantName || "Mihman"}
+                🏢 {settings?.restaurantName || "akay"}
               </Typography>
               <Typography variant="body2" sx={{ color: colors.textSecondary, lineHeight: 1.8 }}>
                 {settings?.slogan || "Kalitelinin adresi"}
@@ -1765,7 +1765,7 @@ const ModernQr = () => {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <EmailIcon sx={{ fontSize: 18, color: "#1a9b8e" }} />
                   <Typography variant="body2" sx={{ color: colors.textSecondary }}>
-                    {settings?.email || "info@mihman.com"}
+                    {settings?.email || "info@akay.com"}
                   </Typography>
                 </Box>
               </Box>

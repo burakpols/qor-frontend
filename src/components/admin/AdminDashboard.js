@@ -111,7 +111,7 @@ const AdminDashboard = () => {
   const [settings, setSettings] = useState(null);
   const [settingsForm, setSettingsForm] = useState({});
   const [savingSettings, setSavingSettings] = useState(false);
-  const [adminTheme, setAdminTheme] = useState(localStorage.getItem("mihman_admin_theme") || "light");
+  const [adminTheme, setAdminTheme] = useState(localStorage.getItem("akay_admin_theme") || "light");
 
   // Dynamic API URL - Railway backend URL for production, localhost for local dev
   const getApiUrl = () => {
@@ -516,7 +516,7 @@ const AdminDashboard = () => {
         <Toolbar>
           <DashboardIcon sx={{ mr: 1, color: "#1a9b8e" }} />
           <Typography variant="h6" sx={{ flex: 1, fontWeight: 700, color: currentTheme.text }}>
-            Mihman - Yönetim Paneli
+            akay - Yönetim Paneli
           </Typography>
           <Button
             color="inherit"
@@ -1740,7 +1740,7 @@ const AdminDashboard = () => {
                           setSettings(settingsForm);
                           // Tema değişirse localStorage'a kaydet ve state'i güncelle
                           if (settingsForm.theme) {
-                            localStorage.setItem("mihman_admin_theme", settingsForm.theme);
+                            localStorage.setItem("akay_admin_theme", settingsForm.theme);
                             setAdminTheme(settingsForm.theme);
                           }
                           toast.success("✅ Ayarlar kaydedildi!");

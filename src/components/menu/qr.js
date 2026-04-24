@@ -60,7 +60,7 @@ const mainUrl = getApiUrl();
     <main>
       <section className="menu section">
         <div className="title">
-          <h2>Mihman Menü</h2>
+          <h2>akay Menü</h2>
           <div className="underline" />
         </div>
         <Categories categories={categories} filterItems={filterItems} />
