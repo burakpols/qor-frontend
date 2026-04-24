@@ -1460,6 +1460,7 @@ const AdminDashboard = () => {
                               size="small"
                               type="time"
                               value={settingsForm?.businessHours?.open || "09:00"}
+                              disabled={!settingsForm?.businessHours?.isEnabled || settingsForm?.businessHours?.is247}
                               onChange={(e) => setSettingsForm({
                                 ...settingsForm,
                                 businessHours: { ...settingsForm?.businessHours, open: e.target.value }
@@ -1482,6 +1483,7 @@ const AdminDashboard = () => {
                               size="small"
                               type="time"
                               value={settingsForm?.businessHours?.close || "23:00"}
+                              disabled={!settingsForm?.businessHours?.isEnabled || settingsForm?.businessHours?.is247}
                               onChange={(e) => setSettingsForm({
                                 ...settingsForm,
                                 businessHours: { ...settingsForm?.businessHours, close: e.target.value }
@@ -1493,6 +1495,69 @@ const AdminDashboard = () => {
                                   "& fieldset": { borderColor: currentTheme.border },
                                 },
                               }}
+                            />
+                          </Box>
+                          <Box>
+                            <Typography sx={{ fontSize: "12px", fontWeight: 700, mb: 1, color: currentTheme.textSecondary }}>
+                              Zaman Dilimi
+                            </Typography>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              select
+                              value={settingsForm?.businessHours?.timezone || "Europe/Istanbul"}
+                              disabled={!settingsForm?.businessHours?.isEnabled || settingsForm?.businessHours?.is247}
+                              onChange={(e) => setSettingsForm({
+                                ...settingsForm,
+                                businessHours: { ...settingsForm?.businessHours, timezone: e.target.value }
+                              })}
+                              sx={{
+                                "& .MuiOutlinedInput-root": {
+                                  backgroundColor: currentTheme.bgSecondary,
+                                  color: currentTheme.text,
+                                  "& fieldset": { borderColor: currentTheme.border },
+                                },
+                              }}
+                            >
+                              <MenuItem value="Europe/Istanbul">Europe/Istanbul (TRT)</MenuItem>
+                              <MenuItem value="Europe/London">Europe/London (GMT)</MenuItem>
+                              <MenuItem value="Europe/Paris">Europe/Paris (CET)</MenuItem>
+                              <MenuItem value="America/New_York">America/New_York (EST)</MenuItem>
+                              <MenuItem value="America/Los_Angeles">America/Los_Angeles (PST)</MenuItem>
+                              <MenuItem value="Asia/Tokyo">Asia/Tokyo (JST)</MenuItem>
+                              <MenuItem value="Asia/Dubai">Asia/Dubai (GST)</MenuItem>
+                            </TextField>
+                          </Box>
+                          <Box>
+                            <FormControlLabel
+                              control={
+                                <Switch
+                                  checked={settingsForm?.businessHours?.is247 || false}
+                                  onChange={(e) => setSettingsForm({
+                                    ...settingsForm,
+                                    businessHours: { ...settingsForm?.businessHours, is247: e.target.checked }
+                                  })}
+                                  color="primary"
+                                />
+                              }
+                              label="7/24 Açık"
+                              sx={{ color: currentTheme.text }}
+                            />
+                          </Box>
+                          <Box>
+                            <FormControlLabel
+                              control={
+                                <Switch
+                                  checked={!settingsForm?.businessHours?.isEnabled}
+                                  onChange={(e) => setSettingsForm({
+                                    ...settingsForm,
+                                    businessHours: { ...settingsForm?.businessHours, isEnabled: !e.target.checked }
+                                  })}
+                                  color="error"
+                                />
+                              }
+                              label="Kapalıyız Modu (Manuel)"
+                              sx={{ color: currentTheme.text }}
                             />
                           </Box>
                         </Stack>

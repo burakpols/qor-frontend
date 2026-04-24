@@ -84,7 +84,54 @@ const ModernQr = () => {
   const [settings, setSettings] = useState(null);
   const [tableError, setTableError] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem("akay_theme") || "light");
-  const [isOpen, setIsOpen] = useState(true);
+  
+  // Settings ilk yükleme - localStorage cache'den isOpen hesaplama (lazy initialization)
+  const [isOpen, setIsOpen] = useState(() => {
+    const cachedSettings = localStorage.getItem("qor_settings");
+    if (cachedSettings) {
+      try {
+        const parsed = JSON.parse(cachedSettings);
+        // Inline business hours check - same logic as checkBusinessHours
+        if (!parsed?.businessHours) return true;
+        if (parsed.businessHours.is247) return true;
+        if (parsed.businessHours.isEnabled === false) return false;
+        if (!parsed.businessHours.open || !parsed.businessHours.close) return true;
+        
+        const timezone = parsed.businessHours.timezone || "Europe/Istanbul";
+        const now = new Date();
+        let localTime;
+        try {
+          const options = { timeZone: timezone, hour: 'numeric', minute: 'numeric', hour12: false };
+          const formatter = new Intl.DateTimeFormat('en-US', options);
+          const parts = formatter.formatToParts(now);
+          const hours = parseInt(parts.find(p => p.type === 'hour').value);
+          const minutes = parseInt(parts.find(p => p.type === 'minute').value);
+          localTime = hours * 60 + minutes;
+        } catch (e) {
+          localTime = now.getHours() * 60 + now.getMinutes();
+        }
+        
+        const [openHour, openMin] = parsed.businessHours.open.split(":").map(Number);
+        const [closeHour, closeMin] = parsed.businessHours.close.split(":").map(Number);
+        const openTime = openHour * 60 + openMin;
+        const closeTime = closeHour * 60 + closeMin;
+        
+        let isOpenNow;
+        if (openTime <= closeTime) {
+          isOpenNow = localTime >= openTime && localTime < closeTime;
+        } else {
+          isOpenNow = localTime >= openTime || localTime < closeTime;
+        }
+        
+        console.log(`🕐 Initial isOpen from cache: timezone=${timezone}, localTime=${localTime}, open=${openTime}, close=${closeTime}, isOpen=${isOpenNow}`);
+        return isOpenNow;
+      } catch (e) {
+        console.warn("⚠️ Cache parse error in initial state");
+        return true;
+      }
+    }
+    return true;
+  });
 
   // AI Chat States
   const [openChat, setOpenChat] = useState(false);
@@ -149,12 +196,42 @@ const ModernQr = () => {
 
   // Çalışma saati kontrolü
   const checkBusinessHours = (settings) => {
-    if (!settings?.businessHours?.open || !settings?.businessHours?.close) {
-      return true; // Eğer saat ayarlanmamışsa açık kabul et
+    // Eğer businessHours ayarı yoksa veya isEnabled false ise (manuel kapalı)
+    if (!settings?.businessHours) {
+      return true; // Ayar yoksa açık kabul et
     }
     
+    // 7/24 açık modu
+    if (settings.businessHours.is247) {
+      return true;
+    }
+    
+    // Manuel kapalı modu (isEnabled false)
+    if (settings.businessHours.isEnabled === false) {
+      return false;
+    }
+    
+    if (!settings.businessHours.open || !settings.businessHours.close) {
+      return true; // Saat ayarlanmamışsa açık kabul et
+    }
+    
+    // Timezone desteği
+    const timezone = settings.businessHours.timezone || "Europe/Istanbul";
     const now = new Date();
-    const currentTime = now.getHours() * 60 + now.getMinutes();
+    
+    // Timezone'a göre saat hesaplama
+    let localTime;
+    try {
+      const options = { timeZone: timezone, hour: 'numeric', minute: 'numeric', hour12: false };
+      const formatter = new Intl.DateTimeFormat('en-US', options);
+      const parts = formatter.formatToParts(now);
+      const hours = parseInt(parts.find(p => p.type === 'hour').value);
+      const minutes = parseInt(parts.find(p => p.type === 'minute').value);
+      localTime = hours * 60 + minutes;
+    } catch (e) {
+      // Timezone hatası olursa sistem saatini kullan
+      localTime = now.getHours() * 60 + now.getMinutes();
+    }
     
     const [openHour, openMin] = settings.businessHours.open.split(":").map(Number);
     const [closeHour, closeMin] = settings.businessHours.close.split(":").map(Number);
@@ -162,8 +239,18 @@ const ModernQr = () => {
     const openTime = openHour * 60 + openMin;
     const closeTime = closeHour * 60 + closeMin;
     
-    console.log(`🕐 CheckBusinessHours: now=${currentTime}, open=${openTime}, close=${closeTime}, isOpen=${currentTime >= openTime && currentTime < closeTime}`);
-    return currentTime >= openTime && currentTime < closeTime;
+    // Gece yarısı geçişi (örn: 22:00 - 06:00)
+    let isOpen;
+    if (openTime <= closeTime) {
+      // Normal aralık (örn: 09:00 - 23:00)
+      isOpen = localTime >= openTime && localTime < closeTime;
+    } else {
+      // Gece yarısı geçişi (örn: 22:00 - 06:00)
+      isOpen = localTime >= openTime || localTime < closeTime;
+    }
+    
+    console.log(`🕐 CheckBusinessHours: timezone=${timezone}, localTime=${localTime}, open=${openTime}, close=${closeTime}, isOpen=${isOpen}`);
+    return isOpen;
   };
 
   // Theme colors
@@ -192,7 +279,7 @@ const ModernQr = () => {
       // LocalStorage cache kontrolü
       const cachedSettings = localStorage.getItem("qor_settings");
       const cacheTimestamp = localStorage.getItem("qor_settings_timestamp");
-      const CACHE_DURATION = 15 * 60 * 1000; // 15 DAKİKA cache süresi
+      const CACHE_DURATION = 1 * 60 * 1000; // 1 DAKİKA cache süresi - Daha hızlı güncellenme için düşürüldü
 
       // Eğer cache var ve süresi dolmamışsa cached veriyi kullan
       if (cachedSettings && cacheTimestamp && (Date.now() - parseInt(cacheTimestamp)) < CACHE_DURATION) {
