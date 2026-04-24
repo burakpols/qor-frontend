@@ -162,6 +162,7 @@ const ModernQr = () => {
     const openTime = openHour * 60 + openMin;
     const closeTime = closeHour * 60 + closeMin;
     
+    console.log(`🕐 CheckBusinessHours: now=${currentTime}, open=${openTime}, close=${closeTime}, isOpen=${currentTime >= openTime && currentTime < closeTime}`);
     return currentTime >= openTime && currentTime < closeTime;
   };
 
@@ -205,6 +206,10 @@ const ModernQr = () => {
             setTheme(parsedSettings.theme);
           }
 
+          // Çalışma saati kontrolü - cache'den yüklenirken de yap
+          const openStatus = checkBusinessHours(parsedSettings);
+          setIsOpen(openStatus);
+
           // Masa validasyonu
           if (tableNumber) {
             const tableNum = parseInt(tableNumber);
@@ -226,6 +231,7 @@ const ModernQr = () => {
       // Cache yok veya süresi dolmuşsa backend'den çek
       try {
         const response = await axios.get(`${apiUrl}/settings`);
+        console.log("📡 Settings response:", response.data);
         setSettings(response.data);
         
         // Cache'e kaydet
@@ -238,8 +244,9 @@ const ModernQr = () => {
           setTheme(response.data.theme);
         }
         
-        // Çalışma saati kontrolü
+        // Çalışma saati kontrolü - settings state'i güncellendikten sonra
         const openStatus = checkBusinessHours(response.data);
+        console.log("🚪 Open status after fetch:", openStatus);
         setIsOpen(openStatus);
         
         // Masa validasyonu
@@ -265,7 +272,11 @@ const ModernQr = () => {
         // Hata durumunda cache'de veri varsa onu kullan
         if (cachedSettings) {
           try {
-            setSettings(JSON.parse(cachedSettings));
+            const parsedCached = JSON.parse(cachedSettings);
+            setSettings(parsedCached);
+            // Çalışma saati kontrolü - hata durumunda da yap
+            const openStatus = checkBusinessHours(parsedCached);
+            setIsOpen(openStatus);
             console.log("✅ Used cached settings after network error");
           } catch (e) {}
         }
@@ -273,17 +284,27 @@ const ModernQr = () => {
     };
     
     fetchSettings();
-    
-    // Sadece saat kontrolü için interval, settings tekrar çekilmiyor!
+  }, [apiUrl, tableNumber]);
+  
+  // Settings her değiştiğinde çalışma saati kontrolü yap
+  useEffect(() => {
+    if (settings) {
+      const openStatus = checkBusinessHours(settings);
+      console.log(`🚪 isOpen updated: ${openStatus}`);
+      setIsOpen(openStatus);
+    }
+  }, [settings]);
+  
+  // Her dakika çalışma saati kontrolü yap
+  useEffect(() => {
     const interval = setInterval(() => {
       if (settings) {
         const openStatus = checkBusinessHours(settings);
         setIsOpen(openStatus);
       }
     }, 60000);
-    
     return () => clearInterval(interval);
-  }, [apiUrl, tableNumber]);
+  }, [settings]);
 
   useEffect(() => {
     const fetchItems = async () => {
