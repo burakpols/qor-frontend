@@ -381,21 +381,27 @@ const AdminDashboard = () => {
 
     try {
       setUploadingImage(true);
-      const formDataObj = new FormData();
-      formDataObj.append("file", imageFile);
 
-      const response = await axios.post(`${apiUrl}/upload`, formDataObj, {
-        ...getAuthHeaders(),
-        headers: {
-          ...getAuthHeaders().headers,
-          "Content-Type": "multipart/form-data",
-        },
+      // Convert file to base64 for Cloudinary
+      const reader = new FileReader();
+      const base64Promise = new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
       });
+      reader.readAsDataURL(imageFile);
+      const base64Image = await base64Promise;
+
+      const response = await axios.post(
+        `${apiUrl}/upload`,
+        { image: base64Image, filename: imageFile.name },
+        getAuthHeaders()
+      );
 
       setFormData({ ...formData, image: response.data.url || response.data.path });
       setImageFile(null);
       toast.success("Resim yüklendi");
     } catch (error) {
+      console.error("Image upload error:", error);
       toast.error("Resim yükleme başarısız: " + (error.response?.data?.message || error.message));
     } finally {
       setUploadingImage(false);
