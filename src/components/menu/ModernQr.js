@@ -44,6 +44,9 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { useSearchParams } from "react-router-dom";
 import "./ModernQr.css";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import "../chat/AIMenuChat.css";
 
 // Get dynamic API URL - Railway backend URL for production, localhost for local dev
 const getApiUrl = () => {
@@ -1124,7 +1127,13 @@ const ModernQr = () => {
                     boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
                   }}
                 >
-                  {msg.content}
+                  {msg.role === "assistant" ? (
+                    <div className="ai-markdown-content">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    msg.content
+                  )}
                 </div>
               </div>
             ))}

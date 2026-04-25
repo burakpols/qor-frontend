@@ -1896,10 +1896,6 @@ const AdminDashboard = () => {
                         </Typography>
                         <Grid container spacing={2}>
                           <Grid item xs={6} sm={3}>
-                            <Typography sx={{ fontSize: "12px", color: currentTheme.textSecondary }}>Admin Hesabı</Typography>
-                            <Typography sx={{ fontWeight: 700, color: currentTheme.text }}>admin / admin123</Typography>
-                          </Grid>
-                          <Grid item xs={6} sm={3}>
                             <Typography sx={{ fontSize: "12px", color: currentTheme.textSecondary }}>Versiyon</Typography>
                             <Typography sx={{ fontWeight: 700, color: currentTheme.text }}>3.0.0 Pro</Typography>
                           </Grid>
