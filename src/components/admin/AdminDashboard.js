@@ -392,7 +392,7 @@ const AdminDashboard = () => {
         },
       });
 
-      setFormData({ ...formData, image: response.data.filePath });
+      setFormData({ ...formData, image: response.data.url || response.data.path });
       setImageFile(null);
       toast.success("Resim yüklendi");
     } catch (error) {
