@@ -80,10 +80,14 @@ const AdminDashboard = () => {
   const [tabValue, setTabValue] = useState("orders");
   const [items, setItems] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [dialogTitle, setDialogTitle] = useState("");
   const [editingItem, setEditingItem] = useState(null);
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [formErrors, setFormErrors] = useState({});
   const [formData, setFormData] = useState({
     category: "",
     subcategory: "",
@@ -250,6 +254,8 @@ const AdminDashboard = () => {
         const settingsRes = await axios.get(`${apiUrl}/settings`);
         setSettings(settingsRes.data);
         setSettingsForm(settingsRes.data);
+        // populate categories from settings on initial load (settings returns the settings doc)
+        setCategories(settingsRes.data?.categories || []);
       } catch (error) {
         console.warn("Settings load error:", error.message);
       }
@@ -414,11 +420,59 @@ const AdminDashboard = () => {
     setImageFile(null);
   };
 
-  const handleSaveItem = async () => {
-    if (!formData.title || !formData.price || !formData.category) {
-      toast.error("Lütfen tüm alanları doldurun");
+  // Yeni kategori ekleme
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) {
+      toast.error("Kategori adı boş olamaz");
       return;
     }
+
+    try {
+      const postRes = await axios.post(`${apiUrl}/categories`, { category: newCategoryName.trim() }, getAuthHeaders());
+      toast.success(`"${newCategoryName.trim()}" kategorisi eklendi`);
+      
+      // Kategorileri yeniden fetch et (backend returns { categories: [...] })
+      const categoriesRes = await axios.get(`${apiUrl}/categories`, getAuthHeaders());
+      setCategories(categoriesRes.data?.categories || categoriesRes.data || postRes.data?.categories || []);
+      
+      // Yeni eklenen kategoriyi seç
+      setFormData({ ...formData, category: newCategoryName.trim() });
+      setNewCategoryName("");
+      setShowNewCategory(false);
+    } catch (error) {
+      if (error.response?.status === 409) {
+        toast.error("Bu kategori zaten mevcut");
+      } else {
+        toast.error("Kategori eklenemedi: " + (error.response?.data?.message || error.message));
+      }
+    }
+  };
+
+  // Check if form is valid
+  const isFormValid = () => {
+    return (
+      formData.title?.trim() &&
+      formData.price > 0 &&
+      formData.category &&
+      formData.desc?.trim()
+    );
+  };
+
+  const handleSaveItem = async () => {
+    // Validasyon
+    const errors = {};
+    if (!formData.title?.trim()) errors.title = true;
+    if (!formData.price || formData.price <= 0) errors.price = true;
+    if (!formData.category) errors.category = true;
+    if (!formData.desc?.trim()) errors.desc = true;
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      toast.error("Lütfen zorunlu alanları doldurun");
+      return;
+    }
+
+    setFormErrors({});
 
     try {
       // Map 'image' to 'img' for backend compatibility
@@ -1905,7 +1959,30 @@ const AdminDashboard = () => {
             </IconButton>
           </DialogTitle>
 
-          <DialogContent sx={{ pt: 3, backgroundColor: currentTheme.bg }}>
+            <DialogContent sx={{ pt: 3, backgroundColor: currentTheme.bg }}>
+            {/* Zorunlu Alan Uyarısı */}
+            {!isFormValid() && (
+              <Alert 
+                severity="warning" 
+                sx={{ 
+                  mb: 2, 
+                  backgroundColor: "#fff3e0", 
+                  color: "#e65100",
+                  border: "1px solid #ff9800",
+                  borderRadius: "8px",
+                  "& .MuiAlert-icon": { color: "#ff9800" }
+                }}
+                icon={<CategoryIcon />}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  ⚠️ Zorunlu alanları doldurmadan ürün kaydedilemez
+                </Typography>
+                <Typography variant="caption" sx={{ fontSize: "11px", mt: 0.5 }}>
+                  Ürün Adı, Kategori, Açıklama ve Fiyat alanları zorunludur
+                </Typography>
+              </Alert>
+            )}
+            
             <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
               {/* Resim Yükleme Bölümü */}
               <Box>
@@ -2032,47 +2109,162 @@ const AdminDashboard = () => {
                   <TextField
                     label="Ürün Adı"
                     value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, title: e.target.value });
+                      if (formErrors.title) setFormErrors({ ...formErrors, title: false });
+                    }}
                     fullWidth
                     variant="outlined"
                     size="medium"
                     placeholder="Örn: Zesty Burger"
+                    required
+                    error={formErrors.title}
+                    helperText={formErrors.title ? "Ürün adı zorunludur" : ""}
                     sx={{
                       "& .MuiOutlinedInput-root": {
                         borderRadius: "8px",
                         backgroundColor: "#fff",
                         "&:hover fieldset": { borderColor: "#1a9b8e" },
                         "&.Mui-focused fieldset": { borderColor: "#1a9b8e" },
+                        ...(formErrors.title && {
+                          "& fieldset": { borderColor: "#ef4444 !important" },
+                        }),
+                      },
+                      "& .MuiFormHelperText-root": {
+                        color: "#ef4444",
+                        fontWeight: 600,
                       },
                     }}
                   />
 
                   <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-                    <TextField
-                      label="Kategori"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      fullWidth
-                      select
-                      SelectProps={{ native: true }}
-                      size="medium"
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          borderRadius: "8px",
-                          backgroundColor: "#fff",
-                          "&:hover fieldset": { borderColor: "#1a9b8e" },
-                          "&.Mui-focused fieldset": { borderColor: "#1a9b8e" },
-                        },
-                      }}
-                    >
-                      <option value="">Seçin...</option>
-                      <option value="Burgers">Burgers</option>
-                      <option value="Pizza">Pizza</option>
-                      <option value="Salads">Salads</option>
-                      <option value="Beverages">Beverages</option>
-                      <option value="Desserts">Desserts</option>
-                      <option value="Pasta">Pasta</option>
-                    </TextField>
+                    <Box>
+                      <TextField
+                        label="Kategori"
+                        value={formData.category}
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        fullWidth
+                        select
+                        SelectProps={{ native: true }}
+                        size="medium"
+                        error={formErrors.category}
+                        helperText={formErrors.category ? "Bu alan zorunludur" : ""}
+                        InputProps={{
+                          endAdornment: formData.category ? null : (
+                            <InputAdornment position="end">
+                              <Button
+                                size="small"
+                                onClick={() => {
+                                  setShowNewCategory(true);
+                                  setFormErrors({ ...formErrors, category: false });
+                                }}
+                                sx={{
+                                  color: "#1a9b8e",
+                                  fontSize: "11px",
+                                  fontWeight: 600,
+                                  textTransform: "none",
+                                  minWidth: "auto",
+                                  px: 1,
+                                  "&:hover": { backgroundColor: "#f0fffe" },
+                                }}
+                              >
+                                + Yeni Ekle
+                              </Button>
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            borderRadius: "8px",
+                            backgroundColor: "#fff",
+                            "&:hover fieldset": { borderColor: "#1a9b8e" },
+                            "&.Mui-focused fieldset": { borderColor: "#1a9b8e" },
+                            ...(formErrors.category && {
+                              "& fieldset": { borderColor: "#ef4444 !important" },
+                            }),
+                          },
+                          "& .MuiFormHelperText-root": {
+                            color: "#ef4444",
+                            fontWeight: 600,
+                          },
+                        }}
+                      >
+                        <option value="">Seçin...</option>
+                        {categories && categories.length > 0 ? (
+                          categories.map((cat) => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))
+                        ) : (
+                          <>
+                            <option value="Burgers">Burgers</option>
+                            <option value="Pizza">Pizza</option>
+                            <option value="Salads">Salads</option>
+                            <option value="Beverages">Beverages</option>
+                            <option value="Desserts">Desserts</option>
+                            <option value="Pasta">Pasta</option>
+                          </>
+                        )}
+                      </TextField>
+                      
+                      {/* Yeni Kategori Ekleme Alanı */}
+                      {showNewCategory && (
+                        <Box sx={{ mt: 1.5, display: "flex", gap: 1, alignItems: "flex-start" }}>
+                          <TextField
+                            label="Yeni Kategori Adı"
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            size="small"
+                            fullWidth
+                            placeholder="Örn: Ana Yemekler"
+                            autoFocus
+                            sx={{
+                              "& .MuiOutlinedInput-root": {
+                                borderRadius: "8px",
+                                backgroundColor: "#fff",
+                                "&:hover fieldset": { borderColor: "#1a9b8e" },
+                                "&.Mui-focused fieldset": { borderColor: "#1a9b8e" },
+                              },
+                            }}
+                            onKeyPress={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleAddCategory();
+                              }
+                            }}
+                          />
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={handleAddCategory}
+                            disabled={!newCategoryName.trim()}
+                            sx={{
+                              backgroundColor: "#1a9b8e",
+                              "&:hover": { backgroundColor: "#158577" },
+                              mt: "4px",
+                              minWidth: "80px",
+                              height: "40px",
+                            }}
+                          >
+                            Ekle
+                          </Button>
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              setShowNewCategory(false);
+                              setNewCategoryName("");
+                            }}
+                            sx={{
+                              color: "#999",
+                              mt: "4px",
+                              minWidth: "auto",
+                              "&:hover": { backgroundColor: "#f5f5f5" },
+                            }}
+                          >
+                            <CloseIcon fontSize="small" />
+                          </Button>
+                        </Box>
+                      )}
+                    </Box>
 
                     <TextField
                       label="Alt Kategori"
@@ -2095,19 +2287,32 @@ const AdminDashboard = () => {
                   <TextField
                     label="Açıklama"
                     value={formData.desc}
-                    onChange={(e) => setFormData({ ...formData, desc: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, desc: e.target.value });
+                      if (formErrors.desc) setFormErrors({ ...formErrors, desc: false });
+                    }}
                     fullWidth
                     multiline
                     rows={3}
                     variant="outlined"
                     placeholder="Ürünün detaylı açıklamasını yazın..."
                     size="medium"
+                    required
+                    error={formErrors.desc}
+                    helperText={formErrors.desc ? "Açıklama zorunludur" : ""}
                     sx={{
                       "& .MuiOutlinedInput-root": {
                         borderRadius: "8px",
                         backgroundColor: "#fff",
                         "&:hover fieldset": { borderColor: "#1a9b8e" },
                         "&.Mui-focused fieldset": { borderColor: "#1a9b8e" },
+                        ...(formErrors.desc && {
+                          "& fieldset": { borderColor: "#ef4444 !important" },
+                        }),
+                      },
+                      "& .MuiFormHelperText-root": {
+                        color: "#ef4444",
+                        fontWeight: 600,
                       },
                     }}
                   />
@@ -2135,9 +2340,15 @@ const AdminDashboard = () => {
                     type="number"
                     inputProps={{ step: "0.01", min: "0" }}
                     value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || "" })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, price: parseFloat(e.target.value) || "" });
+                      if (formErrors.price) setFormErrors({ ...formErrors, price: false });
+                    }}
                     fullWidth
                     size="medium"
+                    required
+                    error={formErrors.price}
+                    helperText={formErrors.price ? "Fiyat zorunludur" : ""}
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
@@ -2151,6 +2362,13 @@ const AdminDashboard = () => {
                         backgroundColor: "#fff",
                         "&:hover fieldset": { borderColor: "#1a9b8e" },
                         "&.Mui-focused fieldset": { borderColor: "#1a9b8e" },
+                        ...(formErrors.price && {
+                          "& fieldset": { borderColor: "#ef4444 !important" },
+                        }),
+                      },
+                      "& .MuiFormHelperText-root": {
+                        color: "#ef4444",
+                        fontWeight: 600,
                       },
                     }}
                   />
@@ -2372,15 +2590,16 @@ const AdminDashboard = () => {
             <Button
               onClick={handleSaveItem}
               variant="contained"
+              disabled={!isFormValid()}
               sx={{
-                backgroundColor: "#1a9b8e",
+                backgroundColor: isFormValid() ? "#1a9b8e" : "#bdbdbd",
                 borderRadius: "8px",
                 fontWeight: 600,
                 px: 3,
-                "&:hover": { backgroundColor: "#158577" },
+                "&:hover": { backgroundColor: isFormValid() ? "#158577" : "#bdbdbd" },
               }}
             >
-              Kaydet
+              {isFormValid() ? "💾 Kaydet" : "🔒 Zorunlu Alanları Doldurun"}
             </Button>
           </DialogActions>
         </Dialog>
